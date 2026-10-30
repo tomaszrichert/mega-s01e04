@@ -1,8 +1,9 @@
 ---
 plan: morning-digest
-status: ready
+status: done
 owner: rook
 opened: 2026-10-29
+completed: 2026-10-30
 ---
 
 # Morning digest
@@ -77,3 +78,26 @@ page again with `LANE_MARKER` unset (the banner reads "no marker set") and uploa
 link. Move this plan to `docs/plans/done/` with its issue list.
 
 Done when: the preview link no longer shows the lane marker.
+
+## Completion record
+
+### Issue list
+
+- [#1 — Digest types and reader contract](https://github.com/tomaszrichert/mega-s01e04/issues/1)
+- [#2 — Run log reader](https://github.com/tomaszrichert/mega-s01e04/issues/2)
+- [#3 — Digest HTML page](https://github.com/tomaszrichert/mega-s01e04/issues/3)
+- [#4 — Digest JSON endpoint](https://github.com/tomaszrichert/mega-s01e04/issues/4)
+- [#5 — Status board digest links](https://github.com/tomaszrichert/mega-s01e04/issues/5)
+- [#6 — Digest route tests](https://github.com/tomaszrichert/mega-s01e04/issues/6)
+- [#7 — Public review preview](https://github.com/tomaszrichert/mega-s01e04/issues/7)
+- [#8 — Preview cleanup and plan archive](https://github.com/tomaszrichert/mega-s01e04/issues/8)
+
+### Verification and review
+
+- Typecheck passed; all 37 tests passed, including 19 HTTP-level digest tests.
+- [Marked preview deployment](https://github.com/tomaszrichert/mega-s01e04/actions/runs/41026208197) succeeded.
+- The course reviewer confirmed seeing the preview and requested marker removal.
+- [Marker-free deployment](https://github.com/tomaszrichert/mega-s01e04/actions/runs/41027029652) succeeded, including the export assertion that the banner reads "no marker set".
+- The human verified the same [public preview URL](https://tomaszrichert.github.io/mega-s01e04/) shows "no marker set" with all five digest rows intact.
+- Preview HTML was deployed as a Pages artifact, never committed to this repository.
+- This records completion of the implementation plan; final course acceptance is tracked separately.
