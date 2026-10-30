@@ -1,0 +1,118 @@
+name: Digest preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_marker:
+        description: Include the lane marker (disable only after review)
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: digest-preview
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify the service
+        run: |
+          pnpm typecheck
+          pnpm test
+
+      - name: Export digest HTML
+        env:
+          INCLUDE_MARKER: ${{ inputs.include_marker }}
+          PREVIEW_MARKER: ${{ secrets.LANE_MARKER }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$INCLUDE_MARKER" == 'true' ]]; then
+            if [[ -z "${PREVIEW_MARKER//[[:space:]]/}" ]]; then
+              printf 'Set the LANE_MARKER repository secret before publishing the marked preview.\n' >&2
+              exit 1
+            fi
+            export LANE_MARKER="$PREVIEW_MARKER"
+          else
+            unset LANE_MARKER
+          fi
+          unset PREVIEW_MARKER
+          export PORT=8787
+
+          pnpm start > "$RUNNER_TEMP/rig-preview.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in {1..30}; do
+            if curl --fail --silent --output /dev/null http://localhost:8787/health; then
+              ready=true
+              break
+            fi
+            kill -0 "$server_pid"
+            sleep 1
+          done
+          if [[ "$ready" != 'true' ]]; then
+            printf 'The service did not become ready.\n' >&2
+            exit 1
+          fi
+
+          mkdir -p "$RUNNER_TEMP/digest-preview"
+          curl --fail --silent --show-error \
+            http://localhost:8787/digest/2026-10-28 \
+            --output "$RUNNER_TEMP/digest-preview/index.html"
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          import assert from 'node:assert/strict';
+          const html = readFileSync(`${process.env.RUNNER_TEMP}/digest-preview/index.html`, 'utf8');
+          assert(html.startsWith('<!doctype html>'), 'Expected a complete HTML document');
+          assert(html.includes('digest · 2026-10-28'), 'Expected the review night');
+          assert(html.includes('<style>'), 'Expected self-contained styles');
+          assert(!/<script\b/i.test(html), 'Client scripts are not permitted');
+          const marker = html.match(/<span class="marker">([^<]*)<\/span>/)?.[1];
+          assert(marker, 'Expected a lane banner');
+          if (process.env.INCLUDE_MARKER === 'true') {
+            assert(marker !== 'no marker set', 'Expected the marked preview');
+          } else {
+            assert.equal(marker, 'no marker set');
+          }
+          JS
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/digest-preview
+          retention-days: 1
+
+  deploy:
+    needs: export
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy preview
+        id: deployment
+        uses: actions/deploy-pages@v4
